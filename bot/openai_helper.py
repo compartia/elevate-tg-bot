@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import datetime
 import io
 import json
@@ -13,6 +12,7 @@ from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_t
 
 from bot.persistence import ConversationPersistence
 from plugin_manager import PluginManager
+from pathlib import Path
 
 # Models can be found here: https://platform.openai.com/docs/models/overview
 # Models gpt-3.5-turbo-0613 and  gpt-3.5-turbo-16k-0613 will be deprecated on June 13, 2024
@@ -26,6 +26,25 @@ GPT_4_128K_MODELS = (
 GPT_4O_MODELS = ("gpt-4o",)
 GPT_ALL_MODELS = GPT_3_MODELS + GPT_3_16K_MODELS + GPT_4_MODELS + GPT_4_32K_MODELS + GPT_4_VISION_MODELS + GPT_4_128K_MODELS + GPT_4O_MODELS
 
+def load_system_prompt(bot_config):
+    config_dir = Path(__file__).parent.parent.resolve() / "config"
+
+    # load yaml config
+    with open(config_dir / "system_prompt.md", 'r') as f:
+        system_prompt = f.read()
+
+    # system_prompt/
+    _data = {'bot_language': bot_config['bot_language']}
+
+
+    try:
+        # fill the template
+        system_prompt_r = system_prompt.format(**_data)
+        system_prompt = system_prompt_r
+    except Exception as e:
+        logging.exception(e)
+
+    return system_prompt
 
 def default_max_tokens(model: str) -> int:
     """
@@ -270,7 +289,7 @@ class OpenAIHelper:
     async def generate_speech(self, text: str) -> tuple[any, int]:
         """
         Generates an audio from the given text using TTS model.
-        :param text: The text to send to the model
+        :param prompt: The text to send to the model
         :return: The audio in bytes and the text size
         """
         bot_language = self.config['bot_language']
@@ -314,7 +333,8 @@ class OpenAIHelper:
         Resets the conversation history.
         """
         if content == '':
-            content = self.config['assistant_prompt']
+            content = load_system_prompt(self.config)
+
         self.conversations[chat_id] = [{"role": "system", "content": content}]
         self.conversations_vision[chat_id] = False
 
