@@ -1,0 +1,13 @@
+- **deploy** in cloud
+- **load** conversations on restart
+- add **supervisor** agent to summarize
+- whitelist on user **nicknames**
+- **limit** usage 
+- **persist** usage to firebase
+- write **welcome** instructions
+- write /**help**
+- implement /reset command
+- get tg default **language**
+- **auto translations** of system messages (get rid of json)
+- add **Antropic** API
+- add **reporting** rendering

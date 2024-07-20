@@ -1,9 +1,11 @@
 from __future__ import annotations
+
 import datetime
 import io
 import json
 import logging
 import os
+from pathlib import Path
 
 import httpx
 import openai
@@ -11,8 +13,6 @@ import tiktoken
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 
 from bot.persistence import ConversationPersistence
-from plugin_manager import PluginManager
-from pathlib import Path
 
 # Models can be found here: https://platform.openai.com/docs/models/overview
 # Models gpt-3.5-turbo-0613 and  gpt-3.5-turbo-16k-0613 will be deprecated on June 13, 2024
@@ -22,20 +22,20 @@ GPT_4_MODELS = ("gpt-4", "gpt-4-0314", "gpt-4-0613", "gpt-4-turbo-preview")
 GPT_4_32K_MODELS = ("gpt-4-32k", "gpt-4-32k-0314", "gpt-4-32k-0613")
 GPT_4_VISION_MODELS = ("gpt-4-vision-preview",)
 GPT_4_128K_MODELS = (
-"gpt-4-1106-preview", "gpt-4-0125-preview", "gpt-4-turbo-preview", "gpt-4-turbo", "gpt-4-turbo-2024-04-09")
+    "gpt-4-1106-preview", "gpt-4-0125-preview", "gpt-4-turbo-preview", "gpt-4-turbo", "gpt-4-turbo-2024-04-09")
 GPT_4O_MODELS = ("gpt-4o",)
 GPT_ALL_MODELS = GPT_3_MODELS + GPT_3_16K_MODELS + GPT_4_MODELS + GPT_4_32K_MODELS + GPT_4_VISION_MODELS + GPT_4_128K_MODELS + GPT_4O_MODELS
+
 
 def load_system_prompt(bot_config):
     config_dir = Path(__file__).parent.parent.resolve() / "config"
 
     # load yaml config
-    with open(config_dir / "system_prompt.md", 'r') as f:
-        system_prompt = f.read()
+    with open(config_dir / "system_prompt.md", 'r') as spf:
+        system_prompt = spf.read()
 
     # system_prompt/
     _data = {'bot_language': bot_config['bot_language']}
-
 
     try:
         # fill the template
@@ -45,6 +45,7 @@ def load_system_prompt(bot_config):
         logging.exception(e)
 
     return system_prompt
+
 
 def default_max_tokens(model: str) -> int:
     """
@@ -80,8 +81,8 @@ def are_functions_available(model: str) -> bool:
         return False
     # Stable models will be updated to support functions on June 27, 2023
     if model in (
-    "gpt-3.5-turbo", "gpt-3.5-turbo-1106", "gpt-4", "gpt-4-32k", "gpt-4-1106-preview", "gpt-4-0125-preview",
-    "gpt-4-turbo-preview"):
+            "gpt-3.5-turbo", "gpt-3.5-turbo-1106", "gpt-4", "gpt-4-32k", "gpt-4-1106-preview", "gpt-4-0125-preview",
+            "gpt-4-turbo-preview"):
         return datetime.date.today() > datetime.date(2023, 6, 27)
     # Models gpt-3.5-turbo-0613 and  gpt-3.5-turbo-16k-0613 will be deprecated on June 13, 2024
     if model in ("gpt-3.5-turbo-0613", "gpt-3.5-turbo-16k-0613"):
@@ -99,6 +100,8 @@ with open(translations_file_path, 'r', encoding='utf-8') as f:
 
 
 def localized_text(key, bot_language):
+    # TODO: translate via bot.
+
     """
     Return translated text for a key in specified bot_language.
     Keys and translations can be found in the translations.json.
@@ -121,18 +124,16 @@ class OpenAIHelper:
     ChatGPT helper class.
     """
 
-    def __init__(self, config: dict, plugin_manager: PluginManager, persistence: ConversationPersistence):
+    def __init__(self, config: dict, persistence: ConversationPersistence):
         """
         Initializes the OpenAI helper class with the given configuration.
         :param config: A dictionary containing the GPT configuration
-        :param plugin_manager: The plugin manager
         """
         self.persistence = persistence
 
         http_client = httpx.AsyncClient(proxies=config['proxy']) if 'proxy' in config else None
         self.client = openai.AsyncOpenAI(api_key=config['api_key'], http_client=http_client)
         self.config = config
-        self.plugin_manager = plugin_manager
         self.conversations: dict[int: list] = {}  # {chat_id: history}
         self.conversations_vision: dict[int: bool] = {}  # {chat_id: is_vision}
         self.last_updated: dict[int: datetime] = {}  # {chat_id: last_update_timestamp}
@@ -154,7 +155,7 @@ class OpenAIHelper:
         :param query: The query to send to the model
         :return: The answer from the model and the number of tokens used
         """
-        plugins_used = ()
+
         response = await self.__common_get_chat_response(chat_id, query)
 
         answer = ''
@@ -172,17 +173,12 @@ class OpenAIHelper:
             self.__add_to_history(chat_id, role="assistant", content=answer)
 
         bot_language = self.config['bot_language']
-        show_plugins_used = len(plugins_used) > 0 and self.config['show_plugins_used']
-        plugin_names = tuple(self.plugin_manager.get_plugin_source_name(plugin) for plugin in plugins_used)
+
         if self.config['show_usage']:
             answer += "\n\n---\n" \
-                      f"💰 {str(response.usage.total_tokens)} {localized_text('stats_tokens', bot_language)}" \
+                      f" {str(response.usage.total_tokens)} {localized_text('stats_tokens', bot_language)}" \
                       f" ({str(response.usage.prompt_tokens)} {localized_text('prompt', bot_language)}," \
                       f" {str(response.usage.completion_tokens)} {localized_text('completion', bot_language)})"
-            if show_plugins_used:
-                answer += f"\n🔌 {', '.join(plugin_names)}"
-        elif show_plugins_used:
-            answer += f"\n\n---\n🔌 {', '.join(plugin_names)}"
 
         return answer, response.usage.total_tokens
 
@@ -193,7 +189,7 @@ class OpenAIHelper:
         :param query: The query to send to the model
         :return: The answer from the model and the number of tokens used, or 'not_finished'
         """
-        plugins_used = ()
+
         response = await self.__common_get_chat_response(chat_id, query, stream=True)
 
         answer = ''
@@ -207,15 +203,6 @@ class OpenAIHelper:
         answer = answer.strip()
         self.__add_to_history(chat_id, role="assistant", content=answer)
         tokens_used = str(self.__count_tokens(self.conversations[chat_id]))
-
-        show_plugins_used = len(plugins_used) > 0 and self.config['show_plugins_used']
-        plugin_names = tuple(self.plugin_manager.get_plugin_source_name(plugin) for plugin in plugins_used)
-        if self.config['show_usage']:
-            answer += f"\n\n---\n💰 {tokens_used} {localized_text('stats_tokens', self.config['bot_language'])}"
-            if show_plugins_used:
-                answer += f"\n🔌 {', '.join(plugin_names)}"
-        elif show_plugins_used:
-            answer += f"\n\n---\n🔌 {', '.join(plugin_names)}"
 
         yield answer, tokens_used
 
@@ -270,11 +257,6 @@ class OpenAIHelper:
                 'stream': stream
             }
 
-            if self.config['enable_functions'] and not self.conversations_vision[chat_id]:
-                functions = self.plugin_manager.get_functions_specs()
-                if len(functions) > 0:
-                    common_args['functions'] = self.plugin_manager.get_functions_specs()
-                    common_args['function_call'] = 'auto'
             return await self.client.chat.completions.create(**common_args)
 
         except openai.RateLimitError as e:
@@ -289,7 +271,7 @@ class OpenAIHelper:
     async def generate_speech(self, text: str) -> tuple[any, int]:
         """
         Generates an audio from the given text using TTS model.
-        :param prompt: The text to send to the model
+        :param text: The text to send to the model
         :return: The audio in bytes and the text size
         """
         bot_language = self.config['bot_language']
