@@ -5,3 +5,6 @@ __pycache__
 /usage_logs
 venv
 /.cache
+/bot/logs
+/logs
+/bot/usage_logs

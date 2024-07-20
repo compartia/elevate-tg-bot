@@ -17,6 +17,7 @@ from PIL import Image
 
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 
+from bot.persistence import ConversationPersistence
 from utils import is_direct_result, encode_image, decode_image
 from plugin_manager import PluginManager
 
@@ -104,12 +105,14 @@ class OpenAIHelper:
     ChatGPT helper class.
     """
 
-    def __init__(self, config: dict, plugin_manager: PluginManager):
+    def __init__(self, config: dict, plugin_manager: PluginManager, persistence: ConversationPersistence):
         """
         Initializes the OpenAI helper class with the given configuration.
         :param config: A dictionary containing the GPT configuration
         :param plugin_manager: The plugin manager
         """
+        self.persistence = persistence
+
         http_client = httpx.AsyncClient(proxies=config['proxy']) if 'proxy' in config else None
         self.client = openai.AsyncOpenAI(api_key=config['api_key'], http_client=http_client)
         self.config = config
@@ -595,6 +598,7 @@ class OpenAIHelper:
         Adds a function call to the conversation history
         """
         self.conversations[chat_id].append({"role": "function", "name": function_name, "content": content})
+        self.persistence.save_conversation(chat_id, self.conversations[chat_id])
 
     def __add_to_history(self, chat_id, role, content):
         """
@@ -604,6 +608,7 @@ class OpenAIHelper:
         :param content: The message content
         """
         self.conversations[chat_id].append({"role": role, "content": content})
+        self.persistence.save_conversation(chat_id, self.conversations[chat_id])
 
     async def __summarise(self, conversation) -> str:
         """
