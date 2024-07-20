@@ -19,6 +19,7 @@ from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_t
 
 from utils import is_direct_result, encode_image, decode_image
 from plugin_manager import PluginManager
+from pathlib import Path
 
 # Models can be found here: https://platform.openai.com/docs/models/overview
 # Models gpt-3.5-turbo-0613 and  gpt-3.5-turbo-16k-0613 will be deprecated on June 13, 2024
@@ -30,6 +31,28 @@ GPT_4_VISION_MODELS = ("gpt-4-vision-preview",)
 GPT_4_128K_MODELS = ("gpt-4-1106-preview","gpt-4-0125-preview","gpt-4-turbo-preview", "gpt-4-turbo", "gpt-4-turbo-2024-04-09")
 GPT_4O_MODELS = ("gpt-4o",)
 GPT_ALL_MODELS = GPT_3_MODELS + GPT_3_16K_MODELS + GPT_4_MODELS + GPT_4_32K_MODELS + GPT_4_VISION_MODELS + GPT_4_128K_MODELS + GPT_4O_MODELS
+
+
+
+def load_system_prompt(bot_config):
+    config_dir = Path(__file__).parent.parent.resolve() / "config"
+
+    # load yaml config
+    with open(config_dir / "system_prompt.md", 'r') as f:
+        system_prompt = f.read()
+
+    # system_prompt/
+    _data = {'bot_language': bot_config['bot_language']}
+
+
+    try:
+        # fill the template
+        system_prompt_r = system_prompt.format(**_data)
+        system_prompt = system_prompt_r
+    except Exception as e:
+        logging.exception(e)
+
+    return system_prompt
 
 def default_max_tokens(model: str) -> int:
     """
@@ -573,7 +596,8 @@ class OpenAIHelper:
         Resets the conversation history.
         """
         if content == '':
-            content = self.config['assistant_prompt']
+            content = load_system_prompt(self.config)
+
         self.conversations[chat_id] = [{"role": "system", "content": content}]
         self.conversations_vision[chat_id] = False
 
@@ -738,3 +762,5 @@ class OpenAIHelper:
     #     billing_data = json.loads(response.text)
     #     usage_month = billing_data["total_usage"] / 100  # convert cent amount to dollars
     #     return usage_month
+
+
