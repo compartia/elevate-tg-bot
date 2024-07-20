@@ -11,3 +11,4 @@
 - **auto translations** of system messages (get rid of json)
 - add **Antropic** API
 - add **reporting** rendering
+- log converastion **metadata**
