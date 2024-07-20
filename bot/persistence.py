@@ -1,6 +1,10 @@
 import json
 import os
 
+import firebase_admin
+from firebase_admin import credentials
+from firebase_admin import db
+
 
 class ConversationPersistence:
     def load_conversation(self, chat_id: int) -> list:
@@ -8,6 +12,13 @@ class ConversationPersistence:
 
     def save_conversation(self, chat_id: int, conversation: list):
         raise NotImplementedError
+
+class IdempotentPersistence(ConversationPersistence):
+    def load_conversation(self, chat_id: int) -> list:
+        pass
+
+    def save_conversation(self, chat_id: int, conversation: list):
+        pass
 
 
 class JSONFileConversationPersistence(ConversationPersistence):
@@ -28,14 +39,6 @@ class JSONFileConversationPersistence(ConversationPersistence):
             json.dump(conversation, f, ensure_ascii=False, indent=2)
 
 
-
-import os
-import json
-import firebase_admin
-from firebase_admin import credentials
-from firebase_admin import db
-from bot.persistence import ConversationPersistence
-
 class FirebaseConversationPersistence(ConversationPersistence):
     def __init__(self):
         # Load Firebase credentials from environment variables
@@ -55,7 +58,6 @@ class FirebaseConversationPersistence(ConversationPersistence):
 
         # Initialize Firebase app
         cred = credentials.Certificate(cred_dict)
-        # firebase_admin.initialize_app(cred)
         firebase_admin.initialize_app(cred, {
             'databaseURL': os.environ.get("FIREBASE_DATABASE_URL")
         })
@@ -69,18 +71,18 @@ class FirebaseConversationPersistence(ConversationPersistence):
     def save_conversation(self, chat_id: int, conversation: list):
         conversation_ref = self.root.child('conversations').child(str(chat_id))
         conversation_ref.set(conversation)
-        print(conversation_ref)
 
 
 if __name__ == '__main__':
+    # TEST, TODO:remove
+    test_uid = 437507654
     from dotenv import load_dotenv
 
     load_dotenv()
     persistence = FirebaseConversationPersistence()
     persistence_j = JSONFileConversationPersistence(storage_dir="logs")
 
-    # persistence = JSONFileConversationPersistence(storage_dir="logs")
-    c = persistence_j.load_conversation(437507654)
-    #
-    # print(c)
-    persistence.save_conversation(-437507654, c)
+    c = persistence.load_conversation(test_uid)
+
+    print(c)
+    persistence.save_conversation(-test_uid, c)

@@ -3,7 +3,7 @@ import os
 
 from dotenv import load_dotenv
 
-from bot.persistence import JSONFileConversationPersistence, FirebaseConversationPersistence
+from bot.persistence import JSONFileConversationPersistence, FirebaseConversationPersistence, IdempotentPersistence
 from openai_helper import OpenAIHelper, default_max_tokens, are_functions_available
 from telegram_bot import ChatGPTTelegramBot
 
@@ -104,9 +104,13 @@ def main():
     }
 
     # Setup and run ChatGPT and Telegram bot
+    persistence = IdempotentPersistence()
+    persistence_type = os.environ.get('PERSITENCE', 'None')
+    if persistence_type == 'Json':
+        persistence = JSONFileConversationPersistence(storage_dir=os.environ.get('CHATS_LOGS_DIR', "logs"))
+    elif persistence_type == 'Firebase':
+        persistence = FirebaseConversationPersistence()
 
-    # persistence = JSONFileConversationPersistence(storage_dir=os.environ.get('CHATS_LOGS_DIR', "logs"))
-    persistence = FirebaseConversationPersistence()
     openai_helper = OpenAIHelper(config=openai_config, persistence=persistence)
     telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper)
     telegram_bot.run()
