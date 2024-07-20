@@ -9,7 +9,7 @@ from telegram import BotCommandScopeAllGroupChats, Update, constants
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, InlineQueryResultArticle
 from telegram import InputTextMessageContent, BotCommand
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, \
-    filters, InlineQueryHandler, CallbackQueryHandler, Application, ContextTypes, CallbackContext
+    filters, Application, ContextTypes, CallbackContext
 
 from openai_helper import OpenAIHelper, localized_text
 from usage_tracker import UsageTracker
@@ -623,13 +623,14 @@ class ChatGPTTelegramBot:
             .concurrent_updates(True) \
             .build()
 
-        application.add_handler(CommandHandler('reset', self.reset))
-        application.add_handler(CommandHandler('help', self.help))
+        # application.add_handler(CommandHandler('reset', self.reset))
+        # application.add_handler(CommandHandler('help', self.help))
 
         application.add_handler(CommandHandler('start', self.start))
 
-        application.add_handler(CommandHandler('stats', self.stats))
-        application.add_handler(CommandHandler('resend', self.resend))
+        # application.add_handler(CommandHandler('stats', self.stats))
+        # application.add_handler(CommandHandler('resend', self.resend))
+
         application.add_handler(CommandHandler(
             'chat', self.prompt, filters=filters.ChatType.GROUP | filters.ChatType.SUPERGROUP)
         )
@@ -639,10 +640,10 @@ class ChatGPTTelegramBot:
             self.transcribe))
         
         application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), self.prompt))
-        application.add_handler(InlineQueryHandler(self.inline_query, chat_types=[
-            constants.ChatType.GROUP, constants.ChatType.SUPERGROUP, constants.ChatType.PRIVATE
-        ]))
-        application.add_handler(CallbackQueryHandler(self.handle_callback_inline_query))
+        # application.add_handler(InlineQueryHandler(self.inline_query, chat_types=[
+        #     constants.ChatType.GROUP, constants.ChatType.SUPERGROUP, constants.ChatType.PRIVATE
+        # ]))
+        # application.add_handler(CallbackQueryHandler(self.handle_callback_inline_query))
 
         application.add_error_handler(error_handler)
 

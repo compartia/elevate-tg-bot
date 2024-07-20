@@ -3,10 +3,9 @@ import os
 
 from dotenv import load_dotenv
 
+from bot.persistence import JSONFileConversationPersistence, FirebaseConversationPersistence
 from openai_helper import OpenAIHelper, default_max_tokens, are_functions_available
-from plugin_manager import PluginManager
 from telegram_bot import ChatGPTTelegramBot
-from bot.persistence import JSONFileConversationPersistence
 
 
 def main():
@@ -104,16 +103,11 @@ def main():
         'bot_language': os.environ.get('BOT_LANGUAGE', 'en'),
     }
 
-    plugin_config = {
-        'plugins': os.environ.get('PLUGINS', '').split(',')
-    }
-
     # Setup and run ChatGPT and Telegram bot
 
-    persistence = JSONFileConversationPersistence(storage_dir=os.environ.get('CHATS_LOGS_DIR', "logs") )
-
-    plugin_manager = PluginManager(config=plugin_config)
-    openai_helper = OpenAIHelper(config=openai_config, plugin_manager=plugin_manager, persistence=persistence)
+    # persistence = JSONFileConversationPersistence(storage_dir=os.environ.get('CHATS_LOGS_DIR', "logs"))
+    persistence = FirebaseConversationPersistence()
+    openai_helper = OpenAIHelper(config=openai_config, persistence=persistence)
     telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper)
     telegram_bot.run()
 
