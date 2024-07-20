@@ -12,7 +12,7 @@ import openai
 import tiktoken
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 
-from bot.persistence import ConversationPersistence
+from persistence import ConversationPersistence
 
 # Models can be found here: https://platform.openai.com/docs/models/overview
 # Models gpt-3.5-turbo-0613 and  gpt-3.5-turbo-16k-0613 will be deprecated on June 13, 2024

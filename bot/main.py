@@ -3,7 +3,7 @@ import os
 
 from dotenv import load_dotenv
 
-from bot.persistence import JSONFileConversationPersistence, FirebaseConversationPersistence, IdempotentPersistence
+from persistence import JSONFileConversationPersistence, FirebaseConversationPersistence, IdempotentPersistence
 from openai_helper import OpenAIHelper, default_max_tokens, are_functions_available
 from telegram_bot import ChatGPTTelegramBot
 
