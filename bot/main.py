@@ -3,10 +3,10 @@ import os
 
 from dotenv import load_dotenv
 
-from plugin_manager import PluginManager
+from bot.persistence import JSONFileConversationPersistence, IdempotentPersistence, FirebaseConversationPersistence
 from openai_helper import OpenAIHelper, default_max_tokens, are_functions_available
+from plugin_manager import PluginManager
 from telegram_bot import ChatGPTTelegramBot
-from bot.persistence import JSONFileConversationPersistence
 
 
 def main():
@@ -55,7 +55,8 @@ def main():
         'show_plugins_used': os.environ.get('SHOW_PLUGINS_USED', 'false').lower() == 'true',
         'whisper_prompt': os.environ.get('WHISPER_PROMPT', ''),
         'vision_model': os.environ.get('VISION_MODEL', 'gpt-4-vision-preview'),
-        'enable_vision_follow_up_questions': os.environ.get('ENABLE_VISION_FOLLOW_UP_QUESTIONS', 'true').lower() == 'true',
+        'enable_vision_follow_up_questions': os.environ.get('ENABLE_VISION_FOLLOW_UP_QUESTIONS',
+                                                            'true').lower() == 'true',
         'vision_prompt': os.environ.get('VISION_PROMPT', 'What is in this image'),
         'vision_detail': os.environ.get('VISION_DETAIL', 'auto'),
         'vision_max_tokens': int(os.environ.get('VISION_MAX_TOKENS', '300')),
@@ -65,7 +66,7 @@ def main():
 
     if openai_config['enable_functions'] and not functions_available:
         logging.error(f'ENABLE_FUNCTIONS is set to true, but the model {model} does not support it. '
-                        'Please set ENABLE_FUNCTIONS to false or use a model that supports it.')
+                      'Please set ENABLE_FUNCTIONS to false or use a model that supports it.')
         exit(1)
     if os.environ.get('MONTHLY_USER_BUDGETS') is not None:
         logging.warning('The environment variable MONTHLY_USER_BUDGETS is deprecated. '
@@ -108,8 +109,12 @@ def main():
     }
 
     # Setup and run ChatGPT and Telegram bot
-
-    persistence = JSONFileConversationPersistence(storage_dir=os.environ.get('CHATS_LOGS_DIR', "logs") )
+    persistence = IdempotentPersistence()
+    persistence_type = os.environ.get('PERSITENCE', 'None')
+    if persistence_type == 'Json':
+        persistence = JSONFileConversationPersistence(storage_dir=os.environ.get('CHATS_LOGS_DIR', "logs"))
+    elif persistence_type == 'Firebase':
+        persistence = FirebaseConversationPersistence()
 
     plugin_manager = PluginManager(config=plugin_config)
     openai_helper = OpenAIHelper(config=openai_config, plugin_manager=plugin_manager, persistence=persistence)
