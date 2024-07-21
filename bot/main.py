@@ -3,6 +3,7 @@ import os
 
 from dotenv import load_dotenv
 
+from bot.ai_provider import ClaudeProvider, load_system_prompt
 from persistence import JSONFileConversationPersistence, FirebaseConversationPersistence, IdempotentPersistence
 from openai_helper import OpenAIHelper, default_max_tokens, are_functions_available
 from telegram_bot import ChatGPTTelegramBot
@@ -61,6 +62,8 @@ def main():
         'vision_max_tokens': int(os.environ.get('VISION_MAX_TOKENS', '300')),
         'tts_model': os.environ.get('TTS_MODEL', 'tts-1'),
         'tts_voice': os.environ.get('TTS_VOICE', 'alloy'),
+
+        'anthropic_api_key': os.environ['ANTHROPIC_API_KEY']
     }
 
     if openai_config['enable_functions'] and not functions_available:
@@ -111,7 +114,8 @@ def main():
     elif persistence_type == 'Firebase':
         persistence = FirebaseConversationPersistence()
 
-    openai_helper = OpenAIHelper(config=openai_config, persistence=persistence)
+    provider = ClaudeProvider(openai_config, load_system_prompt(openai_config))
+    openai_helper = OpenAIHelper(config=openai_config, persistence=persistence, provider=provider)
     telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper)
     telegram_bot.run()
 
