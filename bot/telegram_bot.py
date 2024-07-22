@@ -11,7 +11,7 @@ from telegram import InputTextMessageContent, BotCommand
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, \
     filters, Application, ContextTypes, CallbackContext
 
-from openai_helper import OpenAIHelper, localized_text
+from openai_helper import AIHelper, localized_text
 from usage_tracker import UsageTracker
 from utils import is_group_chat, get_thread_id, message_text, wrap_with_indicator, split_into_chunks, \
     edit_message_with_retry, is_allowed, get_remaining_budget, is_within_budget, \
@@ -24,7 +24,7 @@ class ChatGPTTelegramBot:
     Class representing a ChatGPT Telegram Bot.
     """
 
-    def __init__(self, config: dict, openai: OpenAIHelper):
+    def __init__(self, config: dict, openai: AIHelper):
         """
         Initializes the bot with the given configuration and GPT bot object.
         :param config: A dictionary containing the bot configuration

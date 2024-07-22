@@ -99,7 +99,7 @@ def localized_text(key, bot_language):
             return key
 
 
-class OpenAIHelper:
+class AIHelper:
     """
     ChatGPT helper class.
     """

@@ -30,6 +30,25 @@ def load_system_prompt(bot_config: Dict[str, str]) -> str:
         return ""
 
 
+def extract_system_prompt(messages: List[Dict[str, str]]) -> Tuple[List[Dict[str, str]], str]:
+    """
+    Extract the system prompt from the messages and return the remaining messages.
+
+    :param messages: List of message dictionaries
+    :return: Tuple of (remaining messages, system prompt)
+    """
+    system_prompt = None
+    remaining_messages = []
+
+    for message in messages:
+        if message['role'] == 'system':
+            system_prompt = message['content']
+        else:
+            remaining_messages.append(message)
+
+    return remaining_messages, system_prompt
+
+
 class AIProvider:
     """Base class for AI providers."""
 
@@ -60,9 +79,12 @@ class OpenAIProvider(AIProvider):
         self.model = config['model']
 
     async def create_completion(self, messages: List[Dict[str, str]]) -> Tuple[str, int]:
+        messages, _ = extract_system_prompt(messages)
+        _prompted_messages = [{"role": "system", "content": self.system_prompt}] + messages
+
         response = await self.client.chat.completions.create(
             model=self.model,
-            messages=messages,
+            messages=_prompted_messages,
             temperature=0.4
         )
         return str(response.choices[0].message.content), response.usage.total_tokens
@@ -77,25 +99,6 @@ class ClaudeProvider(AIProvider):
         self.max_tokens = 1024
         self.client = AsyncAnthropic(api_key=config['anthropic_api_key'])
         self.system_prompt = system_prompt
-
-    @staticmethod
-    def extract_system_prompt(messages: List[Dict[str, str]]) -> Tuple[List[Dict[str, str]], str]:
-        """
-        Extract the system prompt from the messages and return the remaining messages.
-
-        :param messages: List of message dictionaries
-        :return: Tuple of (remaining messages, system prompt)
-        """
-        system_prompt = None
-        remaining_messages = []
-
-        for message in messages:
-            if message['role'] == 'system':
-                system_prompt = message['content']
-            else:
-                remaining_messages.append(message)
-
-        return remaining_messages, system_prompt
 
     @staticmethod
     def merge_consecutive_messages(messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
@@ -119,7 +122,7 @@ class ClaudeProvider(AIProvider):
         return merged
 
     async def create_completion(self, messages: List[Dict[str, str]]) -> Tuple[str, int]:
-        messages, extracted_system_prompt = self.extract_system_prompt(messages)
+        messages, extracted_system_prompt = extract_system_prompt(messages)
         messages = self.merge_consecutive_messages(messages)
 
         system_prompt = extracted_system_prompt or self.system_prompt
