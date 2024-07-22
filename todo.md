@@ -1,6 +1,6 @@
 - [x] **deploy** in cloud
 - [x] add **Antropic** API
-- [ ] **load** conversations on restart
+- [x] **load** conversations on restart
 
 - [ ] whitelist on user **nicknames**
 - [ ] **limit** usage 
