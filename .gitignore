@@ -1,6 +1,7 @@
 __pycache__
 /.idea
 .env
+.prod.env
 .DS_Store
 /usage_logs
 venv
@@ -8,3 +9,4 @@ venv
 /bot/logs
 /logs
 /bot/usage_logs
+/.prod.env
