@@ -3,9 +3,9 @@ import os
 
 from dotenv import load_dotenv
 
-from bot.ai_provider import ClaudeProvider, load_system_prompt, OpenAIProvider
-from persistence import JSONFileConversationPersistence, FirebaseConversationPersistence, IdempotentPersistence
+from ai_provider import load_system_prompt, OpenAIProvider
 from openai_helper import AIHelper, default_max_tokens, are_functions_available
+from persistence import JSONFileConversationPersistence, FirebaseConversationPersistence, IdempotentPersistence
 from telegram_bot import ChatGPTTelegramBot
 
 

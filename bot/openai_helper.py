@@ -11,7 +11,7 @@ import tiktoken
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 
 from ai_provider import AIProvider
-from bot.history import ChatHistory
+from history import ChatHistory
 from persistence import ConversationPersistence
 
 # Models can be found here: https://platform.openai.com/docs/models/overview

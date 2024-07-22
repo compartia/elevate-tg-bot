@@ -1,22 +1,18 @@
 from __future__ import annotations
 
 import logging
-import os
 from uuid import uuid4
 
-from pydub import AudioSegment
+from telegram import BotCommand
 from telegram import BotCommandScopeAllGroupChats, Update, constants
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton, InlineQueryResultArticle
-from telegram import InputTextMessageContent, BotCommand
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, \
-    filters, Application, ContextTypes, CallbackContext
+    filters, Application, ContextTypes
 
 from openai_helper import AIHelper, localized_text
 from usage_tracker import UsageTracker
 from utils import is_group_chat, get_thread_id, message_text, wrap_with_indicator, split_into_chunks, \
-    edit_message_with_retry, is_allowed, get_remaining_budget, is_within_budget, \
-    get_reply_to_message_id, add_chat_request_to_usage_tracker, error_handler, is_direct_result, handle_direct_result, \
-    cleanup_intermediate_files
+    is_allowed, get_remaining_budget, is_within_budget, \
+    get_reply_to_message_id, add_chat_request_to_usage_tracker, error_handler, is_direct_result, handle_direct_result
 
 
 class ChatGPTTelegramBot:
