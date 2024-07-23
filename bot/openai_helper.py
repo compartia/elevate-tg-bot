@@ -129,8 +129,7 @@ class AIHelper:
 
         answer, total_tokens = await self.__common_get_chat_response(chat_id, query)
 
-        role = self.provider.get_ai_role()
-        self.conv[chat_id].add(role, answer)
+        self.conv[chat_id].add(self.provider.get_ai_role(), answer)
         return answer, total_tokens
 
     @retry(
@@ -174,8 +173,8 @@ class AIHelper:
                     logging.warning(f'Error while summarising chat history: {str(e)}. Popping elements instead...')
                     self.conv[chat_id].trim(self.config['max_history_size'])
 
-            messages = self.conv[chat_id].get_messages()
-            return await self.provider.create_completion(messages)
+
+            return await self.provider.create_completion(self.conv[chat_id])
 
         except openai.RateLimitError as e:
             raise e
