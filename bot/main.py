@@ -3,7 +3,7 @@ import os
 
 from dotenv import load_dotenv
 
-from ai_provider import load_system_prompt, OpenAIProvider
+from ai_provider import load_system_prompt, ClaudeProvider
 from openai_helper import AIHelper, default_max_tokens, are_functions_available
 from persistence import JSONFileConversationPersistence, FirebaseConversationPersistence, IdempotentPersistence
 from telegram_bot import ChatGPTTelegramBot
@@ -114,8 +114,8 @@ def main():
     elif persistence_type == 'Firebase':
         persistence = FirebaseConversationPersistence()
 
-    # provider = ClaudeProvider(openai_config, load_system_prompt(openai_config))
-    provider = OpenAIProvider(openai_config, load_system_prompt(openai_config))
+    provider = ClaudeProvider(openai_config, load_system_prompt(openai_config))
+    # provider = OpenAIProvider(openai_config, load_system_prompt(openai_config))
     openai_helper = AIHelper(config=openai_config, persistence=persistence, provider=provider)
     telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper)
     telegram_bot.run()

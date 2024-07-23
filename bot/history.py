@@ -1,5 +1,6 @@
-from typing import List, Dict
 import json
+
+from typing import List, Tuple, Dict
 
 
 class ChatHistory:
@@ -20,8 +21,9 @@ class ChatHistory:
         self.messages.append(message)
         self.save()
 
-    def trim(self, max_len:int):
+    def trim(self, max_len: int):
         self.messages = self.messages[-max_len:]
+
     def save(self):
         """
         Save the current chat history to the persistence layer.
@@ -81,3 +83,52 @@ class ChatHistory:
         :return: String representation of the chat history
         """
         return json.dumps(self.messages, indent=2)
+
+    def replace_empty_messages(self, replacement: str = '...') -> List[Dict[str, str]]:
+        """
+        Replace empty message contents with a placeholder.
+
+        :param replacement: Placeholder text for empty messages
+        :return: List of messages with empty contents replaced
+        """
+        return [
+            {'role': m['role'], 'content': replacement if m['content'].strip() == '' else m['content']}
+            for m in self.messages
+        ]
+
+    def extract_system_prompt(self) -> Tuple[List[Dict[str, str]], str]:
+        """
+        Extract the system prompt from the messages and return the remaining messages.
+
+        :param messages: List of message dictionaries
+        :return: Tuple of (remaining messages, system prompt)
+        """
+        system_prompt = None
+        remaining_messages = []
+
+        for message in self.messages:
+
+            if message['role'] == 'system':
+                system_prompt = message['content']
+            else:
+                remaining_messages.append(message)
+
+        return remaining_messages, system_prompt
+
+    def merge_consecutive_messages(self) -> List[Dict[str, str]]:
+        """
+        Merge consecutive messages from the same role.
+
+        :param messages: List of message dictionaries
+        :return: List of merged message dictionaries
+        """
+
+        merged = [self.messages[0]]
+
+        for message in self.messages[1:]:
+            if message['role'] == merged[-1]['role']:
+                merged[-1]['content'] += f"\n{message['content']}"
+            else:
+                merged.append(message)
+
+        return merged

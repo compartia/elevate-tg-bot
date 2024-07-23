@@ -9,9 +9,8 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, \
     filters, Application, ContextTypes
 
 from openai_helper import AIHelper, localized_text
-from usage_tracker import UsageTracker
 from utils import is_group_chat, get_thread_id, message_text, wrap_with_indicator, split_into_chunks, \
-    is_allowed, get_remaining_budget, is_within_budget, \
+    is_allowed, is_within_budget, \
     get_reply_to_message_id, add_chat_request_to_usage_tracker, error_handler, is_direct_result, handle_direct_result
 
 
@@ -32,21 +31,23 @@ class ChatGPTTelegramBot:
         self.commands = [
             BotCommand(command='help', description=localized_text('help_description', bot_language)),
             BotCommand(command='reset', description=localized_text('reset_description', bot_language)),
-            BotCommand(command='stats', description=localized_text('stats_description', bot_language)),
-            BotCommand(command='resend', description=localized_text('resend_description', bot_language))
+            # BotCommand(command='stats', description=localized_text('stats_description', bot_language)),
+            # BotCommand(command='resend', description=localized_text('resend_description', bot_language))
         ]
         # If imaging is enabled, add the "image" command to the list
-        if self.config.get('enable_image_generation', False):
-            self.commands.append(BotCommand(command='image', description=localized_text('image_description', bot_language)))
-
-        if self.config.get('enable_tts_generation', False):
-            self.commands.append(BotCommand(command='tts', description=localized_text('tts_description', bot_language)))
+        # if self.config.get('enable_image_generation', False):
+        #     self.commands.append(BotCommand(command='image', description=localized_text('image_description', bot_language)))
+        #
+        # if self.config.get('enable_tts_generation', False):
+        #     self.commands.append(BotCommand(command='tts', description=localized_text('tts_description', bot_language)))
 
         self.group_commands = [BotCommand(
             command='chat', description=localized_text('chat_description', bot_language)
         )] + self.commands
+
         self.disallowed_message = localized_text('disallowed', bot_language)
         self.budget_limit_message = localized_text('budget_limit', bot_language)
+
         self.usage = {}
         self.last_message = {}
         self.inline_queries_cache = {}
@@ -69,141 +70,6 @@ class ChatGPTTelegramBot:
         )
         await update.message.reply_text(help_text, disable_web_page_preview=True)
 
-    async def stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """
-        Returns token usage statistics for current day and month.
-        """
-        if not await is_allowed(self.config, update, context):
-            logging.warning(f'User {update.message.from_user.name} (id: {update.message.from_user.id}) '
-                            'is not allowed to request their usage statistics')
-            await self.send_disallowed_message(update, context)
-            return
-
-        logging.info(f'User {update.message.from_user.name} (id: {update.message.from_user.id}) '
-                     'requested their usage statistics')
-
-        user_id = update.message.from_user.id
-        if user_id not in self.usage:
-            self.usage[user_id] = UsageTracker(user_id, update.message.from_user.name)
-
-        tokens_today, tokens_month = self.usage[user_id].get_current_token_usage()
-        images_today, images_month = self.usage[user_id].get_current_image_count()
-        (transcribe_minutes_today, transcribe_seconds_today, transcribe_minutes_month,
-         transcribe_seconds_month) = self.usage[user_id].get_current_transcription_duration()
-        vision_today, vision_month = self.usage[user_id].get_current_vision_tokens()
-        characters_today, characters_month = self.usage[user_id].get_current_tts_usage()
-        current_cost = self.usage[user_id].get_current_cost()
-
-        chat_id = update.effective_chat.id
-        chat_messages, chat_token_length = self.openai.get_conversation_stats(chat_id)
-        remaining_budget = get_remaining_budget(self.config, self.usage, update)
-        bot_language = self.config['bot_language']
-        
-        text_current_conversation = (
-            f"*{localized_text('stats_conversation', bot_language)[0]}*:\n"
-            f"{chat_messages} {localized_text('stats_conversation', bot_language)[1]}\n"
-            f"{chat_token_length} {localized_text('stats_conversation', bot_language)[2]}\n"
-            "----------------------------\n"
-        )
-        
-        # Check if image generation is enabled and, if so, generate the image statistics for today
-        text_today_images = ""
-        if self.config.get('enable_image_generation', False):
-            text_today_images = f"{images_today} {localized_text('stats_images', bot_language)}\n"
-
-        text_today_vision = ""
-        if self.config.get('enable_vision', False):
-            text_today_vision = f"{vision_today} {localized_text('stats_vision', bot_language)}\n"
-
-        text_today_tts = ""
-        if self.config.get('enable_tts_generation', False):
-            text_today_tts = f"{characters_today} {localized_text('stats_tts', bot_language)}\n"
-        
-        text_today = (
-            f"*{localized_text('usage_today', bot_language)}:*\n"
-            f"{tokens_today} {localized_text('stats_tokens', bot_language)}\n"
-            f"{text_today_images}"  # Include the image statistics for today if applicable
-            f"{text_today_vision}"
-            f"{text_today_tts}"
-            f"{transcribe_minutes_today} {localized_text('stats_transcribe', bot_language)[0]} "
-            f"{transcribe_seconds_today} {localized_text('stats_transcribe', bot_language)[1]}\n"
-            f"{localized_text('stats_total', bot_language)}{current_cost['cost_today']:.2f}\n"
-            "----------------------------\n"
-        )
-        
-        text_month_images = ""
-        if self.config.get('enable_image_generation', False):
-            text_month_images = f"{images_month} {localized_text('stats_images', bot_language)}\n"
-
-        text_month_vision = ""
-        if self.config.get('enable_vision', False):
-            text_month_vision = f"{vision_month} {localized_text('stats_vision', bot_language)}\n"
-
-        text_month_tts = ""
-        if self.config.get('enable_tts_generation', False):
-            text_month_tts = f"{characters_month} {localized_text('stats_tts', bot_language)}\n"
-        
-        # Check if image generation is enabled and, if so, generate the image statistics for the month
-        text_month = (
-            f"*{localized_text('usage_month', bot_language)}:*\n"
-            f"{tokens_month} {localized_text('stats_tokens', bot_language)}\n"
-            f"{text_month_images}"  # Include the image statistics for the month if applicable
-            f"{text_month_vision}"
-            f"{text_month_tts}"
-            f"{transcribe_minutes_month} {localized_text('stats_transcribe', bot_language)[0]} "
-            f"{transcribe_seconds_month} {localized_text('stats_transcribe', bot_language)[1]}\n"
-            f"{localized_text('stats_total', bot_language)}{current_cost['cost_month']:.2f}"
-        )
-
-        # text_budget filled with conditional content
-        text_budget = "\n\n"
-        budget_period = self.config['budget_period']
-        if remaining_budget < float('inf'):
-            text_budget += (
-                f"{localized_text('stats_budget', bot_language)}"
-                f"{localized_text(budget_period, bot_language)}: "
-                f"${remaining_budget:.2f}.\n"
-            )
-        # No longer works as of July 21st 2023, as OpenAI has removed the billing API
-        # add OpenAI account information for admin request
-        # if is_admin(self.config, user_id):
-        #     text_budget += (
-        #         f"{localized_text('stats_openai', bot_language)}"
-        #         f"{self.openai.get_billing_current_month():.2f}"
-        #     )
-
-        text_budget=''
-        usage_text = text_current_conversation + text_today + text_month + text_budget
-        await update.message.reply_text(usage_text, parse_mode=constants.ParseMode.MARKDOWN)
-
-    async def resend(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """
-        Resend the last request
-        """
-        if not await is_allowed(self.config, update, context):
-            logging.warning(f'User {update.message.from_user.name}  (id: {update.message.from_user.id})'
-                            ' is not allowed to resend the message')
-            await self.send_disallowed_message(update, context)
-            return
-
-        chat_id = update.effective_chat.id
-        if chat_id not in self.last_message:
-            logging.warning(f'User {update.message.from_user.name} (id: {update.message.from_user.id})'
-                            ' does not have anything to resend')
-            await update.effective_message.reply_text(
-                message_thread_id=get_thread_id(update),
-                text=localized_text('resend_failed', self.config['bot_language'])
-            )
-            return
-
-        # Update message text, clear self.last_message and send the request to prompt
-        logging.info(f'Resending the last prompt from user: {update.message.from_user.name} '
-                     f'(id: {update.message.from_user.id})')
-        with update.message._unfrozen() as message:
-            message.text = self.last_message.pop(chat_id)
-
-        await self.prompt(update=update, context=context)
-
     async def reset(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
         Resets the conversation.
@@ -225,15 +91,17 @@ class ChatGPTTelegramBot:
             text=localized_text('reset_done', self.config['bot_language'])
         )
 
-
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         # update.message='\n'
-        await self.prompt(update=update, context=context)
+        # prompt = '😂'  # TODO: tranduire
+        prompt = 'Привет'  # TODO: tranduire
+        await self.__prompt(prompt=prompt, chat_id=update.effective_chat.id, user_id=update.message.from_user.id,
+                            update=update, context=context)
 
     async def prompt(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
-        React to incoming messages and respond accordingly.
-        """
+                React to incoming messages and respond accordingly.
+                """
         if update.edited_message or not update.message or update.message.via_bot:
             return
 
@@ -247,6 +115,11 @@ class ChatGPTTelegramBot:
         user_id = update.message.from_user.id
         prompt = message_text(update.message)
         self.last_message[chat_id] = prompt
+
+        await self.__prompt(prompt=prompt, chat_id=chat_id, user_id=user_id, update=update, context=context)
+
+    async def __prompt(self, prompt: str, chat_id: int, user_id: int, update: Update,
+                       context: ContextTypes.DEFAULT_TYPE):
 
         if is_group_chat(update):
             trigger_keyword = self.config['group_trigger_keyword']
@@ -268,7 +141,7 @@ class ChatGPTTelegramBot:
 
         try:
             total_tokens = 0
-            
+
             async def _reply():
                 nonlocal total_tokens
                 response, total_tokens = await self.openai.get_chat_response(chat_id=chat_id, query=prompt)
@@ -311,7 +184,6 @@ class ChatGPTTelegramBot:
                 text=f"{localized_text('chat_fail', self.config['bot_language'])} {str(e)}",
                 parse_mode=constants.ParseMode.MARKDOWN
             )
-
 
     async def check_allowed_and_within_budget(self, update: Update, context: ContextTypes.DEFAULT_TYPE,
                                               is_inline=False) -> bool:
@@ -397,7 +269,7 @@ class ChatGPTTelegramBot:
         # application.add_handler(MessageHandler(
         #     filters.AUDIO | filters.VOICE | filters.Document.AUDIO,
         #     self.transcribe))
-        
+
         application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), self.prompt))
         # application.add_handler(InlineQueryHandler(self.inline_query, chat_types=[
         #     constants.ChatType.GROUP, constants.ChatType.SUPERGROUP, constants.ChatType.PRIVATE

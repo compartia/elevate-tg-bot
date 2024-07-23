@@ -8,6 +8,7 @@ import httpx
 import openai
 from anthropic import AsyncAnthropic
 
+from bot.history import ChatHistory
 from persistence import JSONFileConversationPersistence
 
 
@@ -30,29 +31,10 @@ def load_system_prompt(bot_config: Dict[str, str]) -> str:
         return ""
 
 
-def extract_system_prompt(messages: List[Dict[str, str]]) -> Tuple[List[Dict[str, str]], str]:
-    """
-    Extract the system prompt from the messages and return the remaining messages.
-
-    :param messages: List of message dictionaries
-    :return: Tuple of (remaining messages, system prompt)
-    """
-    system_prompt = None
-    remaining_messages = []
-
-    for message in messages:
-        if message['role'] == 'system':
-            system_prompt = message['content']
-        else:
-            remaining_messages.append(message)
-
-    return remaining_messages, system_prompt
-
-
 class AIProvider:
     """Base class for AI providers."""
 
-    async def create_completion(self, messages: List[Dict[str, str]]) -> Tuple[str, int]:
+    async def create_completion(self, conversation: ChatHistory) -> Tuple[str, int]:
         """
         Create a completion based on the given messages.
 
@@ -78,8 +60,10 @@ class OpenAIProvider(AIProvider):
         self.client = openai.AsyncOpenAI(api_key=config['api_key'], http_client=http_client)
         self.model = config['model']
 
-    async def create_completion(self, messages: List[Dict[str, str]]) -> Tuple[str, int]:
-        messages, _ = extract_system_prompt(messages)
+    async def create_completion(self, conversation: ChatHistory) -> Tuple[str, int]:
+        messages, _ = conversation.extract_system_prompt()
+        # conversation.messages = messages
+
         _prompted_messages = [{"role": "system", "content": self.system_prompt}] + messages
 
         response = await self.client.chat.completions.create(
@@ -100,38 +84,19 @@ class ClaudeProvider(AIProvider):
         self.client = AsyncAnthropic(api_key=config['anthropic_api_key'])
         self.system_prompt = system_prompt
 
-    @staticmethod
-    def merge_consecutive_messages(messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
-        """
-        Merge consecutive messages from the same role.
+    async def create_completion(self, conversation: ChatHistory) -> Tuple[str, int]:
+        _m, _ = conversation.extract_system_prompt()
+        conversation.messages = _m
+        conversation.messages = conversation.merge_consecutive_messages()
+        conversation.messages = conversation.replace_empty_messages()
 
-        :param messages: List of message dictionaries
-        :return: List of merged message dictionaries
-        """
-        if not messages:
-            return messages
-
-        merged = [messages[0]]
-
-        for message in messages[1:]:
-            if message['role'] == merged[-1]['role']:
-                merged[-1]['content'] += f"\n{message['content']}"
-            else:
-                merged.append(message)
-
-        return merged
-
-    async def create_completion(self, messages: List[Dict[str, str]]) -> Tuple[str, int]:
-        messages, extracted_system_prompt = extract_system_prompt(messages)
-        messages = self.merge_consecutive_messages(messages)
-
-        system_prompt = extracted_system_prompt or self.system_prompt
+        # system_prompt = extracted_system_prompt or self.system_prompt
 
         response = await self.client.messages.create(
             model=self.model,
             max_tokens=self.max_tokens,
-            messages=messages,
-            system=system_prompt
+            messages=conversation.messages,
+            system=self.system_prompt
         )
 
         if len(response.content) > 1:
