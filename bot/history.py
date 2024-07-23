@@ -100,14 +100,12 @@ class ChatHistory:
         """
         Extract the system prompt from the messages and return the remaining messages.
 
-        :param messages: List of message dictionaries
         :return: Tuple of (remaining messages, system prompt)
         """
         system_prompt = None
         remaining_messages = []
 
         for message in self.messages:
-
             if message['role'] == 'system':
                 system_prompt = message['content']
             else:
@@ -119,12 +117,12 @@ class ChatHistory:
         """
         Merge consecutive messages from the same role.
 
-        :param messages: List of message dictionaries
         :return: List of merged message dictionaries
         """
+        if not self.messages:
+            return []
 
         merged = [self.messages[0]]
-
         for message in self.messages[1:]:
             if message['role'] == merged[-1]['role']:
                 merged[-1]['content'] += f"\n{message['content']}"
