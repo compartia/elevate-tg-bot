@@ -2,9 +2,10 @@ import logging
 import os
 
 from dotenv import load_dotenv
+from langchain_anthropic import ChatAnthropic
 
 from ai_provider import load_system_prompt, ClaudeProvider
-from openai_helper import AIHelper, default_max_tokens, are_functions_available
+from openai_helper import AIHelper#, default_max_tokens, are_functions_available
 from persistence import JSONFileConversationPersistence, FirebaseConversationPersistence, IdempotentPersistence
 from telegram_bot import ChatGPTTelegramBot
 
@@ -29,8 +30,10 @@ def main():
 
     # Setup configurations
     model = os.environ.get('OPENAI_MODEL', 'gpt-3.5-turbo')
-    functions_available = are_functions_available(model=model)
-    max_tokens_default = default_max_tokens(model=model)
+    # functions_available = are_functions_available(model=model)
+
+    #TODO:
+    max_tokens_default = 4096 #default_max_tokens(model=model)
 
     openai_config = {
         'api_key': os.environ['OPENAI_API_KEY'],
@@ -47,7 +50,7 @@ def main():
         'image_style': os.environ.get('IMAGE_STYLE', 'vivid'),
         'image_size': os.environ.get('IMAGE_SIZE', '512x512'),
         'model': model,
-        'enable_functions': os.environ.get('ENABLE_FUNCTIONS', str(functions_available)).lower() == 'true',
+        # 'enable_functions': os.environ.get('ENABLE_FUNCTIONS', str(functions_available)).lower() == 'true',
         'functions_max_consecutive_calls': int(os.environ.get('FUNCTIONS_MAX_CONSECUTIVE_CALLS', 10)),
         'presence_penalty': float(os.environ.get('PRESENCE_PENALTY', 0.0)),
         'frequency_penalty': float(os.environ.get('FREQUENCY_PENALTY', 0.0)),
@@ -66,10 +69,10 @@ def main():
         'anthropic_api_key': os.environ['ANTHROPIC_API_KEY']
     }
 
-    if openai_config['enable_functions'] and not functions_available:
-        logging.error(f'ENABLE_FUNCTIONS is set to true, but the model {model} does not support it. '
-                      'Please set ENABLE_FUNCTIONS to false or use a model that supports it.')
-        exit(1)
+    # if openai_config['enable_functions'] and not functions_available:
+    #     logging.error(f'ENABLE_FUNCTIONS is set to true, but the model {model} does not support it. '
+    #                   'Please set ENABLE_FUNCTIONS to false or use a model that supports it.')
+    #     exit(1)
     if os.environ.get('MONTHLY_USER_BUDGETS') is not None:
         logging.warning('The environment variable MONTHLY_USER_BUDGETS is deprecated. '
                         'Please use USER_BUDGETS with BUDGET_PERIOD instead.')
@@ -114,9 +117,10 @@ def main():
     elif persistence_type == 'Firebase':
         persistence = FirebaseConversationPersistence()
 
-    provider = ClaudeProvider(openai_config, load_system_prompt(openai_config))
+    model = ChatAnthropic(model='claude-3-sonnet-20240229')
+
     # provider = OpenAIProvider(openai_config, load_system_prompt(openai_config))
-    openai_helper = AIHelper(config=openai_config, persistence=persistence, provider=provider)
+    openai_helper = AIHelper(config=openai_config, persistence=persistence, model=model, prompt=load_system_prompt(openai_config))
     telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper)
     telegram_bot.run()
 

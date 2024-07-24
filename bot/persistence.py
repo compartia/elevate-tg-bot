@@ -41,6 +41,7 @@ class JSONFileConversationPersistence(ConversationPersistence):
 
 class FirebaseConversationPersistence(ConversationPersistence):
     def __init__(self):
+        super().__init__()
         # Load Firebase credentials from environment variables
         cred_dict = {
             "type": "service_account",
@@ -56,6 +57,7 @@ class FirebaseConversationPersistence(ConversationPersistence):
             "universe_domain": "googleapis.com"
         }
 
+        self.collection = os.environ.get("FIREBASE_DATABASE_COLLECTION", 'test_conversations')
         # Initialize Firebase app
         cred = credentials.Certificate(cred_dict)
         firebase_admin.initialize_app(cred, {
@@ -64,12 +66,12 @@ class FirebaseConversationPersistence(ConversationPersistence):
         self.root = db.reference()
 
     def load_conversation(self, chat_id: int) -> list:
-        conversation_ref = self.root.child('conversations').child(str(chat_id))
+        conversation_ref = self.root.child(self.collection).child(str(chat_id))
         conversation_data = conversation_ref.get()
         return conversation_data if conversation_data else []
 
     def save_conversation(self, chat_id: int, conversation: list):
-        conversation_ref = self.root.child('conversations').child(str(chat_id))
+        conversation_ref = self.root.child(self.collection).child(str(chat_id))
         conversation_ref.set(conversation)
 
 
