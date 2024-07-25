@@ -8,7 +8,7 @@ from typing import Dict
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 
-from openai_helper import AIHelper  # , default_max_tokens, are_functions_available
+from ai_helper import AIHelper  # , default_max_tokens, are_functions_available
 from persistence import FirebaseConversationPersistence, IdempotentPersistence
 from persistence import JSONFileConversationPersistence
 from telegram_bot import ChatGPTTelegramBot

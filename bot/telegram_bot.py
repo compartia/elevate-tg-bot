@@ -8,7 +8,7 @@ from telegram import BotCommandScopeAllGroupChats, Update, constants
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, \
     filters, Application, ContextTypes
 
-from openai_helper import AIHelper, localized_text
+from ai_helper import AIHelper, localized_text
 from utils import is_group_chat, get_thread_id, message_text, wrap_with_indicator, split_into_chunks, \
     is_allowed, is_within_budget, \
     get_reply_to_message_id, add_chat_request_to_usage_tracker, error_handler, is_direct_result, handle_direct_result
@@ -29,7 +29,7 @@ class ChatGPTTelegramBot:
         self.openai = openai
         bot_language = self.config['bot_language']
         self.commands = [
-            BotCommand(command='help', description=localized_text('help_description', bot_language)),
+            # BotCommand(command='help', description=localized_text('help_description', bot_language)),
             BotCommand(command='reset', description=localized_text('reset_description', bot_language)),
             # BotCommand(command='stats', description=localized_text('stats_description', bot_language)),
             # BotCommand(command='resend', description=localized_text('resend_description', bot_language))

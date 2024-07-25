@@ -3,14 +3,12 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import List
 
-from langchain.schema import SystemMessage, BaseMessage
-from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 
+from history import PersistentChatMessageHistory
 from persistence import ConversationPersistence
 
 # Load translations
@@ -26,43 +24,6 @@ def localized_text(key, bot_language):
     except KeyError:
         logging.warning(f"No translation available for bot_language code '{bot_language}' and key '{key}'")
         return translations.get('en', {}).get(key, key)
-
-
-class PersistentChatMessageHistory(BaseChatMessageHistory):
-    def __init__(self, chat_id: int, persistence: ConversationPersistence):
-        super().__init__()
-        self.chat_id = chat_id
-        self.messages: List[BaseMessage] = []
-        self.persistence: ConversationPersistence = persistence
-
-        self.load()
-
-    def add_message(self, message: BaseMessage) -> None:
-        """Add a self-created message to the store.
-
-        Args:
-            message: The message to add.
-        """
-        self.messages.append(message)
-        self.save()
-
-    def clear(self) -> None:
-        super().clear()
-        self.save()
-
-    def save(self) -> None:
-        messages = [{"role": m.type, "content": m.content} for m in self.messages]
-        self.persistence.save_conversation(self.chat_id, messages)
-
-    def load(self) -> None:
-        messages = self.persistence.load_conversation(self.chat_id)
-        for message in messages:
-            if message["role"] == "human":
-                self.add_user_message(message["content"])
-            elif message["role"] == "ai":
-                self.add_ai_message(message["content"])
-            elif message["role"] == "system":
-                self.add_message(SystemMessage(content=message["content"]))
 
 
 class AIHelper:
