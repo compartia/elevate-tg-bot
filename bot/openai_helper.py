@@ -66,8 +66,8 @@ class PersistentChatMessageHistory(BaseChatMessageHistory):
 
 
 class AIHelper:
-    def __init__(self, config: dict, persistence: ConversationPersistence, model: BaseChatModel = None, prompt=""):
-        self.config = config
+    def __init__(self,  persistence: ConversationPersistence, model: BaseChatModel = None, prompt=""):
+
         self.persistence = persistence
         self.prompt = prompt
         self.model = model  # or ChatAnthropic(model_name="claude-3-sonnet-20240229")
@@ -115,8 +115,8 @@ class AIHelper:
     #     memory.clear()
 
     def reset_conversation(self, chat_id: int) -> None:
-        history = PersistentChatMessageHistory(chat_id, self.persistence)
-        history.clear()
+        self.histories[chat_id] = PersistentChatMessageHistory(chat_id, self.persistence)
+        self.histories[chat_id].clear()
 
     # Placeholder for future summarization feature
     async def summarize(self, chat_id: int) -> str:

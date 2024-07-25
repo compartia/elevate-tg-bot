@@ -1,13 +1,37 @@
+from __future__ import annotations
+
 import logging
 import os
+from pathlib import Path
+from typing import Dict
 
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 
-from ai_provider import load_system_prompt, ClaudeProvider
-from openai_helper import AIHelper#, default_max_tokens, are_functions_available
-from persistence import JSONFileConversationPersistence, FirebaseConversationPersistence, IdempotentPersistence
+from openai_helper import AIHelper  # , default_max_tokens, are_functions_available
+from persistence import FirebaseConversationPersistence, IdempotentPersistence
+from persistence import JSONFileConversationPersistence
 from telegram_bot import ChatGPTTelegramBot
+
+
+def load_system_prompt() -> str:
+    """
+    Load and format the system prompt from a configuration file.
+
+
+    :return: Formatted system prompt
+    """
+    config_dir = Path(__file__).parent.parent.resolve() / "config"
+    bot_language = os.environ.get('BOT_LANGUAGE', 'en')
+
+    try:
+        with open(config_dir / "system_prompt.md", 'r') as prompt_file:
+            system_prompt = prompt_file.read()
+
+        return system_prompt.format(bot_language=bot_language)
+    except Exception as e:
+        logging.exception(f"Error loading system prompt: {e}")
+        return ""
 
 
 def main():
@@ -27,58 +51,6 @@ def main():
     if len(missing_values) > 0:
         logging.error(f'The following environment values are missing in your .env: {", ".join(missing_values)}')
         exit(1)
-
-    # Setup configurations
-    model = os.environ.get('OPENAI_MODEL', 'gpt-3.5-turbo')
-    # functions_available = are_functions_available(model=model)
-
-    #TODO:
-    max_tokens_default = 4096 #default_max_tokens(model=model)
-
-    openai_config = {
-        'api_key': os.environ['OPENAI_API_KEY'],
-        'show_usage': os.environ.get('SHOW_USAGE', 'false').lower() == 'true',
-        'stream': os.environ.get('STREAM', 'true').lower() == 'true',
-        'proxy': os.environ.get('PROXY', None) or os.environ.get('OPENAI_PROXY', None),
-        'max_history_size': int(os.environ.get('MAX_HISTORY_SIZE', 15)),
-        'max_conversation_age_minutes': int(os.environ.get('MAX_CONVERSATION_AGE_MINUTES', 180)),
-        'max_tokens': int(os.environ.get('MAX_TOKENS', max_tokens_default)),
-        'n_choices': int(os.environ.get('N_CHOICES', 1)),
-        'temperature': float(os.environ.get('TEMPERATURE', 1.0)),
-        'image_model': os.environ.get('IMAGE_MODEL', 'dall-e-2'),
-        'image_quality': os.environ.get('IMAGE_QUALITY', 'standard'),
-        'image_style': os.environ.get('IMAGE_STYLE', 'vivid'),
-        'image_size': os.environ.get('IMAGE_SIZE', '512x512'),
-        'model': model,
-        # 'enable_functions': os.environ.get('ENABLE_FUNCTIONS', str(functions_available)).lower() == 'true',
-        'functions_max_consecutive_calls': int(os.environ.get('FUNCTIONS_MAX_CONSECUTIVE_CALLS', 10)),
-        'presence_penalty': float(os.environ.get('PRESENCE_PENALTY', 0.0)),
-        'frequency_penalty': float(os.environ.get('FREQUENCY_PENALTY', 0.0)),
-        'bot_language': os.environ.get('BOT_LANGUAGE', 'en'),
-        'show_plugins_used': os.environ.get('SHOW_PLUGINS_USED', 'false').lower() == 'true',
-        'whisper_prompt': os.environ.get('WHISPER_PROMPT', ''),
-        'vision_model': os.environ.get('VISION_MODEL', 'gpt-4-vision-preview'),
-        'enable_vision_follow_up_questions': os.environ.get('ENABLE_VISION_FOLLOW_UP_QUESTIONS',
-                                                            'true').lower() == 'true',
-        'vision_prompt': os.environ.get('VISION_PROMPT', 'What is in this image'),
-        'vision_detail': os.environ.get('VISION_DETAIL', 'auto'),
-        'vision_max_tokens': int(os.environ.get('VISION_MAX_TOKENS', '300')),
-        'tts_model': os.environ.get('TTS_MODEL', 'tts-1'),
-        'tts_voice': os.environ.get('TTS_VOICE', 'alloy'),
-
-        'anthropic_api_key': os.environ['ANTHROPIC_API_KEY']
-    }
-
-    # if openai_config['enable_functions'] and not functions_available:
-    #     logging.error(f'ENABLE_FUNCTIONS is set to true, but the model {model} does not support it. '
-    #                   'Please set ENABLE_FUNCTIONS to false or use a model that supports it.')
-    #     exit(1)
-    if os.environ.get('MONTHLY_USER_BUDGETS') is not None:
-        logging.warning('The environment variable MONTHLY_USER_BUDGETS is deprecated. '
-                        'Please use USER_BUDGETS with BUDGET_PERIOD instead.')
-    if os.environ.get('MONTHLY_GUEST_BUDGET') is not None:
-        logging.warning('The environment variable MONTHLY_GUEST_BUDGET is deprecated. '
-                        'Please use GUEST_BUDGET with BUDGET_PERIOD instead.')
 
     telegram_config = {
         'token': os.environ['TELEGRAM_BOT_TOKEN'],
@@ -119,8 +91,7 @@ def main():
 
     model = ChatAnthropic(model='claude-3-sonnet-20240229')
 
-    # provider = OpenAIProvider(openai_config, load_system_prompt(openai_config))
-    openai_helper = AIHelper(config=openai_config, persistence=persistence, model=model, prompt=load_system_prompt(openai_config))
+    openai_helper = AIHelper(persistence=persistence, model=model, prompt=load_system_prompt())
     telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper)
     telegram_bot.run()
 
